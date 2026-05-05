@@ -20,18 +20,17 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          # 1. Configure identity
           git config --global user.email "actions@github.com"
           git config --global user.name "GitHub Actions"
           
-          # 2. Delete the large notebook folder
+          # 1. Clean the environment
           rm -rf notebook/
           
-          # 3. Create a clean branch with NO history to bypass the 10MB limit
+          # 2. Create the clean branch
           git checkout --orphan temp-branch
           git add -A
-          git commit -m "Initial sync to HF without notebooks"
+          git commit -m "Syncing project to HF"
           
-          # 4. Force push the clean branch to HF's main branch
+          # 3. Add remote and push with progress tracking
           git remote add hf https://pavandoddavarapu:$HF_TOKEN@huggingface.co/spaces/pavandoddavarapu/anpr_atcc_project
           git push --force hf temp-branch:main
