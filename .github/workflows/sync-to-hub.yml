@@ -2,8 +2,7 @@ name: Sync to Hugging Face Hub
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -23,14 +22,14 @@ jobs:
           git config --global user.email "actions@github.com"
           git config --global user.name "GitHub Actions"
           
-          # 1. Clean the environment
+          # Force clean state by removing notebooks and large files
           rm -rf notebook/
           
-          # 2. Create the clean branch
+          # Create a new branch with NO history to bypass size limits for old commits
           git checkout --orphan temp-branch
           git add -A
-          git commit -m "Syncing project to HF"
+          git commit -m "Clean sync to Hugging Face"
           
-          # 3. Add remote and push with progress tracking
+          # Push to the Space
           git remote add hf https://pavandoddavarapu:$HF_TOKEN@huggingface.co/spaces/pavandoddavarapu/anpr_atcc_project
           git push --force hf temp-branch:main
