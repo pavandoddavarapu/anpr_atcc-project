@@ -1,6 +1,7 @@
 import streamlit as st
 import json
 import cv2
+import torch
 from ultralytics import YOLO 
 import numpy as np
 import math
@@ -13,71 +14,112 @@ import tempfile
 import pandas as pd
 import io
 import matplotlib.pyplot as plt
+import base64
+import logging
+import time
+from dotenv import load_dotenv
 
-# --- TESSERACT OCR LIBRARIES ---
+# --- System Logging Setup ---
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[
+        logging.FileHandler("system_logs.log"),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
+# --- PyTorch 2.6+ Weights-Only Fix (Robust) ---
+_original_load = torch.load
+def _patched_load(*args, **kwargs):
+    kwargs['weights_only'] = False
+    return _original_load(*args, **kwargs)
+torch.load = _patched_load
+# ----------------------------------------------
+
+# --- Configuration & Environment ---
+load_dotenv()
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+
+# OCR Settings
+import sys
+if sys.platform.startswith('win'):
+    default_tesseract = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+else:
+    default_tesseract = "tesseract"
+
+TESSERACT_CMD_PATH = os.getenv("TESSERACT_CMD_PATH", default_tesseract)
 import pytesseract
-# NOTE: Manual TESSERACT_PATH assignment has been REMOVED. 
-# The script now relies entirely on Tesseract being in the system's PATH.
-# ---------------------------------
+pytesseract.pytesseract.tesseract_cmd = TESSERACT_CMD_PATH
+
+# Model paths
+LP_CUSTOM_WEIGHTS_PATH = os.getenv("LP_MODEL_PATH", "weights/best.pt")
+ATCC_MODEL_PATH = os.getenv("ATCC_MODEL_PATH", "yolo11n.pt")
+
+# Databases
+LP_DB_PATH = os.getenv("LP_DB_PATH", "licensePlatesDatabase.db")
+ATCC_DB_PATH = os.getenv("ATCC_DB_PATH", "traffic_analysis.db")
 
 # NOTE: The TrafficDB class definition is assumed to be in 'traffic_db.py'
 # The user's prompt did not include this file, so a placeholder class is used
 # to prevent execution errors, but *you must provide the actual implementation*
 # of TrafficDB for the second mode to function correctly.
 class TrafficDB:
-    """Placeholder for the required TrafficDB class from traffic_db.py."""
-    def __init__(self, db_name='traffic_analysis.db'):
-        self.db_name = db_name
+    def __init__(self, db_name=None):
+        self.db_name = db_name or ATCC_DB_PATH
         self.setup_traffic_database()
 
     def setup_traffic_database(self):
-        conn = sqlite3.connect(self.db_name)
-        cursor = conn.cursor()
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS analysis_results (
-                id INTEGER PRIMARY KEY,
-                timestamp TEXT,
-                source_type TEXT,
-                vehicle_class TEXT,
-                count INTEGER,
-                traffic_level TEXT
-            )
-        ''')
-        conn.commit()
-        conn.close()
+        try:
+            with sqlite3.connect(self.db_name) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS analysis_results (
+                        id INTEGER PRIMARY KEY,
+                        timestamp TEXT,
+                        source_type TEXT,
+                        vehicle_class TEXT,
+                        count INTEGER,
+                        traffic_level TEXT
+                    )
+                ''')
+                conn.commit()
+        except sqlite3.Error as e:
+            logger.error(f"ATCC DB Setup Error: {e}")
 
     def save_result(self, timestamp, source_type, vehicle_class, count, traffic_level):
-        conn = sqlite3.connect(self.db_name)
-        cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO analysis_results 
-            (timestamp, source_type, vehicle_class, count, traffic_level)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (timestamp, source_type, vehicle_class, count, traffic_level))
-        conn.commit()
-        conn.close()
+        try:
+            with sqlite3.connect(self.db_name) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    INSERT INTO analysis_results 
+                    (timestamp, source_type, vehicle_class, count, traffic_level)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (timestamp, source_type, vehicle_class, count, traffic_level))
+                conn.commit()
+                logger.info(f"Saved ATCC result: {vehicle_class} x {count}")
+        except sqlite3.Error as e:
+            logger.error(f"ATCC DB Save Error: {e}")
 
     def fetch_all_data(self):
-        conn = sqlite3.connect(self.db_name)
-        df = pd.read_sql_query("SELECT * FROM analysis_results", conn)
-        conn.close()
-        return df
+        try:
+            with sqlite3.connect(self.db_name) as conn:
+                df = pd.read_sql_query("SELECT * FROM analysis_results", conn)
+                return df
+        except sqlite3.Error as e:
+            logger.error(f"ATCC DB Fetch Error: {e}")
+            return pd.DataFrame()
 
     def clear_db(self):
-        conn = sqlite3.connect(self.db_name)
-        cursor = conn.cursor()
-        cursor.execute('DELETE FROM analysis_results')
-        conn.commit()
-        conn.close()
-        
-# --- Global Configuration and Initialization ---
-
-os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
-os.makedirs("json", exist_ok=True)
-
-# Model paths for the two distinct features
-LP_CUSTOM_WEIGHTS_PATH = "weights/best.pt" 
-ATCC_MODEL_PATH = "yolo11n.pt" 
+        try:
+            with sqlite3.connect(self.db_name) as conn:
+                cursor = conn.cursor()
+                cursor.execute('DELETE FROM analysis_results')
+                conn.commit()
+                logger.info("ATCC Database cleared.")
+        except sqlite3.Error as e:
+            logger.error(f"ATCC DB Clear Error: {e}")
 
 # Class Names for LP Detector
 LP_CLASS_NAMES = ["licence", "licenseplate"] 
@@ -86,8 +128,10 @@ LP_CLASS_NAMES = ["licence", "licenseplate"]
 try:
     pytesseract.image_to_string(Image.new('RGB', (10, 10)), config='--psm 10')
     TESSERACT_AVAILABLE = True
-except Exception:
+    logger.info("Tesseract is available.")
+except Exception as e:
     TESSERACT_AVAILABLE = False
+    logger.warning(f"Tesseract is NOT available: {e}")
     
 # --- Common/Cached YOLO Model Loader ---
 
@@ -108,22 +152,53 @@ def initialize_yolo_model(weights_path):
 
 def setup_license_plate_database():
     """Sets up the SQLite database and table for License Plates."""
-    conn = sqlite3.connect('licensePlatesDatabase.db')
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS LicensePlates (
-            id INTEGER PRIMARY KEY,
-            start_time TEXT,
-            end_time TEXT,
-            license_plate TEXT
-        )
-    ''')
-    conn.commit()
-    conn.close()
+    try:
+        with sqlite3.connect(LP_DB_PATH) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS LicensePlates (
+                    id INTEGER PRIMARY KEY,
+                    start_time TEXT,
+                    end_time TEXT,
+                    license_plate TEXT
+                )
+            ''')
+            conn.commit()
+    except sqlite3.Error as e:
+        logger.error(f"LP DB Setup Error: {e}")
 
 setup_license_plate_database()
 
 # --- LICENSE PLATE MODE FUNCTIONS ---
+
+def is_valid_license_plate(text):
+    """Validates if the text looks like a real license plate."""
+    if not text: return False
+    if len(text) < 4 or len(text) > 10: return False
+    if not text.isalnum(): return False
+    has_alpha = any(c.isalpha() for c in text)
+    has_digit = any(c.isdigit() for c in text)
+    if not (has_alpha and has_digit): return False
+    return True
+
+def has_significant_change(prev_frame, curr_frame, threshold=25, min_changed_pixels_ratio=0.01):
+    """Detects if there is significant motion between two frames."""
+    if prev_frame is None or curr_frame is None:
+        return True
+    
+    gray_prev = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
+    gray_curr = cv2.cvtColor(curr_frame, cv2.COLOR_BGR2GRAY)
+    
+    diff = cv2.absdiff(gray_prev, gray_curr)
+    _, thresh = cv2.threshold(diff, threshold, 255, cv2.THRESH_BINARY)
+    
+    non_zero_count = np.count_nonzero(thresh)
+    total_pixels = thresh.size
+    
+    if total_pixels == 0: return True
+    
+    ratio = non_zero_count / total_pixels
+    return ratio >= min_changed_pixels_ratio
 
 def tesseract_ocr_process(frame, x1, y1, x2, y2):
     """Performs Tesseract OCR on a cropped license plate."""
@@ -139,8 +214,10 @@ def tesseract_ocr_process(frame, x1, y1, x2, y2):
     cropped_frame = frame[y1:y2, x1:x2].copy()
     
     try:
-        # Pre-processing: Grayscale -> Threshold (Otsu) -> Blur
+        # Pre-processing: Grayscale -> CLAHE (Night Vision) -> Threshold -> Blur
         gray = cv2.cvtColor(cropped_frame, cv2.COLOR_BGR2GRAY)
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        gray = clahe.apply(gray)
         _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
         thresh = cv2.medianBlur(thresh, 3) 
         
@@ -157,59 +234,35 @@ def tesseract_ocr_process(frame, x1, y1, x2, y2):
     cleaned_text = pattern.sub('', raw_text.upper()).strip()
     final_text = cleaned_text.replace(" ", "") 
 
-    # --- Enforced Saving Logic (Guaranteed result) ---
-    if not final_text:
-        return f"NO_CLEAN_TEXT({raw_text.strip() or 'BLANK'})"
+    if not is_valid_license_plate(final_text):
+        return None
         
     return final_text
 
-def save_lp_json(license_plates, startTime, endTime):
-    """Saves license plate data to individual and cumulative JSON files."""
+def save_lp_data(license_plates, startTime, endTime):
+    """Saves license plate data to the database."""
     if not license_plates:
         return
-        
-    interval_data = {
-        "Start Time": startTime.isoformat(),
-        "End Time": endTime.isoformat(),
-        "License Plates": list(license_plates)
-    }
-    
-    interval_file_path = f"json/output_{datetime.now().strftime('%Y%m%d%H%M%S')}.json"
-    with open(interval_file_path, 'w') as f:
-        json.dump(interval_data, f, indent=2)
-
-    cummulative_file_path = "json/LicensePlateData.json"
-    existing_data = []
-    if os.path.exists(cummulative_file_path):
-        try:
-            with open(cummulative_file_path, 'r') as f:
-                existing_data = json.load(f)
-        except json.JSONDecodeError:
-            st.warning("Cumulative JSON file corrupted. Starting a new one.")
-
-    existing_data.append(interval_data)
-
-    with open(cummulative_file_path, 'w') as f:
-        json.dump(existing_data, f, indent=2)
 
     save_to_lp_database(license_plates, startTime, endTime)
-    st.success(f"Saved data for {len(license_plates)} detected entries to JSON/DB.")
 
 
 def save_to_lp_database(license_plates, start_time, end_time):
     """Saves license plate data to the SQLite database (LicensePlates table)."""
-    conn = sqlite3.connect('licensePlatesDatabase.db')
-    cursor = conn.cursor()
-    for plate in license_plates:
-        cursor.execute('''
-            INSERT INTO LicensePlates(start_time, end_time, license_plate)
-            VALUES (?, ?, ?)
-        ''', (start_time.isoformat(), end_time.isoformat(), plate))
-            
-    conn.commit()
-    conn.close()
+    try:
+        with sqlite3.connect(LP_DB_PATH) as conn:
+            cursor = conn.cursor()
+            for plate in license_plates:
+                cursor.execute('''
+                    INSERT INTO LicensePlates(start_time, end_time, license_plate)
+                    VALUES (?, ?, ?)
+                ''', (start_time.isoformat(), end_time.isoformat(), plate))
+            conn.commit()
+            logger.info(f"Saved {len(license_plates)} license plates to DB.")
+    except sqlite3.Error as e:
+        logger.error(f"LP DB Save Error: {e}")
 
-def process_lp_frame(frame, license_plates_set, model):
+def process_lp_frame(frame, license_plates_dict, model):
     """Runs YOLO detection and Tesseract OCR on a single frame."""
     if model is None:
         return frame
@@ -232,10 +285,39 @@ def process_lp_frame(frame, license_plates_set, model):
             # Execute OCR function
             label = tesseract_ocr_process(frame.copy(), x1, y1, x2, y2)
             
-            # Label will always be non-empty due to enforced placeholders
-            license_plates_set.add(label)
-                
-            display_label = label if label else f'{clsName}:{conf:.2f}'
+            if label:
+                if label not in license_plates_dict:
+                    # Capture the vehicle context crop and encode to base64
+                    h, w, _ = frame.shape
+                    cx1, cy1, cx2, cy2 = max(0, x1), max(0, y1), min(w, x2), min(h, y2)
+                    
+                    if cx2 > cx1 and cy2 > cy1:
+                        plate_width = cx2 - cx1
+                        plate_height = cy2 - cy1
+                        
+                        # Expand dimensions for context (vehicle)
+                        vx1 = max(0, cx1 - int(2.5 * plate_width))
+                        vx2 = min(w, cx2 + int(2.5 * plate_width))
+                        vy1 = max(0, cy1 - int(4.0 * plate_height))
+                        vy2 = min(h, cy2 + int(1.5 * plate_height))
+                        
+                        if vx2 > vx1 and vy2 > vy1:
+                            vehicle_crop = frame[vy1:vy2, vx1:vx2].copy()
+                            # Draw a box around the plate INSIDE the vehicle crop for clarity
+                            cv2.rectangle(vehicle_crop, (cx1 - vx1, cy1 - vy1), (cx2 - vx1, cy2 - vy1), (0, 255, 0), 2)
+                            _, buffer = cv2.imencode('.jpg', vehicle_crop)
+                        else:
+                            # Fallback to basic crop
+                            cropped_plate = frame[cy1:cy2, cx1:cx2].copy()
+                            _, buffer = cv2.imencode('.jpg', cropped_plate)
+                            
+                        b64_str = base64.b64encode(buffer).decode('utf-8')
+                        license_plates_dict[label] = f"data:image/jpeg;base64,{b64_str}"
+                    else:
+                        license_plates_dict[label] = None
+                display_label = label
+            else:
+                display_label = f'{clsName}:{conf:.2f}'
 
             # Draw bounding box
             cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
@@ -250,17 +332,21 @@ def process_lp_frame(frame, license_plates_set, model):
 
     return frame
 
-def lp_video_processing_loop(cap, model):
+def lp_video_processing_loop(cap, model, watchlist=None):
     """Processes video from a capture object (file or camera) for License Plate Detection."""
     st.subheader("Processing Video Feed... 🚗")
     
     frame_placeholder = st.empty()
     status_placeholder = st.empty()
     plate_placeholder = st.empty()
+    alert_placeholder = st.empty()
     
     startTime = datetime.now()
-    license_plates = set()
+    license_plates = {}
+    alerts_triggered = set()
     frame_count = 0
+    session_data = []
+    last_processed_frame = None
     
     is_file = cap.get(cv2.CAP_PROP_FRAME_COUNT) > 0 
     max_frames = 600 if not is_file else cap.get(cv2.CAP_PROP_FRAME_COUNT)
@@ -276,21 +362,39 @@ def lp_video_processing_loop(cap, model):
         h, w, _ = frame.shape
         if w > 800:
             frame = cv2.resize(frame, (800, int(800 * h / w)))
+
+        # Dynamic frame skip based on motion
+        if not has_significant_change(last_processed_frame, frame):
+            # We still need to respect the 600 frame limit for webcam
+            if not is_file and frame_count >= 600:
+                break 
+            continue
+            
+        last_processed_frame = frame.copy()
         
         processed_frame = process_lp_frame(frame, license_plates, model)
         
+        # Check Watchlist Alerts
+        if watchlist:
+            for plate in license_plates.keys():
+                if plate in watchlist and plate not in alerts_triggered:
+                    alert_placeholder.error(f"🚨 **WATCHLIST ALERT!** Wanted vehicle `{plate}` has been detected!")
+                    alerts_triggered.add(plate)
+                    
         frame_placeholder.image(cv2.cvtColor(processed_frame, cv2.COLOR_BGR2RGB), channels="RGB", caption=f"Frame {frame_count}/{int(max_frames) if is_file else 'live'}")
 
         # Time-based saving logic (every 20 seconds)
         currentTime = datetime.now()
         if (currentTime - startTime).seconds >= 20:
             endTime = currentTime
-            save_lp_json(license_plates, startTime, endTime)
+            save_lp_data(list(license_plates.keys()), startTime, endTime)
+            for plate, img_uri in license_plates.items():
+                session_data.append({"Start Time": startTime.strftime('%Y-%m-%d %H:%M:%S'), "End Time": endTime.strftime('%Y-%m-%d %H:%M:%S'), "License Plate": plate, "Image": img_uri})
             startTime = currentTime
             license_plates.clear()
 
         status_placeholder.text(f"Frames processed: {frame_count} | Unique Entries: {len(license_plates)} (since last save)")
-        plate_placeholder.json({"Detected Entries (since last save)": list(license_plates)})
+        plate_placeholder.json({"Detected Entries (since last save)": list(license_plates.keys())})
         
         if not is_file and frame_count >= 600:
              break 
@@ -298,11 +402,44 @@ def lp_video_processing_loop(cap, model):
         cv2.waitKey(1) 
 
     if license_plates:
-        save_lp_json(license_plates, startTime, datetime.now())
+        endTime = datetime.now()
+        save_lp_data(list(license_plates.keys()), startTime, endTime)
+        for plate, img_uri in license_plates.items():
+            session_data.append({"Start Time": startTime.strftime('%Y-%m-%d %H:%M:%S'), "End Time": endTime.strftime('%Y-%m-%d %H:%M:%S'), "License Plate": plate, "Image": img_uri})
         
     cap.release()
     frame_placeholder.empty()
+    status_placeholder.empty()
+    plate_placeholder.empty()
     st.success("Video processing finished.")
+
+    if session_data:
+        st.subheader("Detected License Plates")
+        
+        df = pd.DataFrame(session_data)
+        
+        col_search, col_export = st.columns([3, 1])
+        with col_search:
+            search_term = st.text_input("🔍 Search Plates:", "", key="video_search")
+        with col_export:
+            st.markdown("<br>", unsafe_allow_html=True)
+            csv = df.drop(columns=["Image"], errors="ignore").to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="⬇️ Export to CSV",
+                data=csv,
+                file_name=f"anpr_export_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                mime='text/csv',
+                key="video_export"
+            )
+            
+        if search_term:
+            df = df[df['License Plate'].str.contains(search_term.upper(), na=False)]
+            
+        st.dataframe(
+            df,
+            column_config={"Image": st.column_config.ImageColumn("Plate Image")},
+            use_container_width=True
+        )
 
 # --- ATCC (VEHICLE ANALYZER) MODE FUNCTIONS ---
 
@@ -446,6 +583,13 @@ def license_plate_mode(model):
         st.error("License Plate YOLO model did not load. Detection is disabled.")
         return
 
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("🚨 Watchlist Settings")
+    watchlist_input = st.sidebar.text_area("Enter plates to track (comma separated)", placeholder="e.g. MH01AB1234, DL4CAF4943")
+    watchlist = [p.strip().upper() for p in watchlist_input.split(',') if p.strip()]
+    
+    st.sidebar.markdown("---")
+    
     source_option = st.sidebar.radio(
         "Select Input Source:",
         ('Upload Video', 'Upload Photo', 'Use Webcam (Experimental)')
@@ -468,13 +612,16 @@ def license_plate_mode(model):
             if st.button("Start Processing Video 🎬"):
                 with st.spinner('Initializing video stream...'):
                     cap = cv2.VideoCapture(temp_video_path)
-                lp_video_processing_loop(cap, model)
+                lp_video_processing_loop(cap, model, watchlist)
                 
-            try:
-                if os.path.exists(temp_video_path):
+            if os.path.exists(temp_video_path):
+                try:
+                    time.sleep(1)
                     os.unlink(temp_video_path)
-            except Exception as e:
-                st.warning(f"Could not clean up temporary file: {e}")
+                except PermissionError:
+                    st.warning("File still in use, skipping delete.")
+                except Exception as e:
+                    st.warning(f"Could not clean up temporary file: {e}")
 
     # --- 2. Photo Upload ---
     elif source_option == 'Upload Photo':
@@ -494,7 +641,7 @@ def license_plate_mode(model):
             with col2:
                 if st.button("Analyze Photo 🖼️"):
                     with st.spinner('Analyzing image...'):
-                        license_plates = set()
+                        license_plates = {}
                         h, w, _ = frame.shape
                         if w > 800:
                             frame = cv2.resize(frame, (800, int(800 * h / w)))
@@ -504,11 +651,43 @@ def license_plate_mode(model):
                         st.image(cv2.cvtColor(processed_frame, cv2.COLOR_BGR2RGB), caption='Processed Image', use_container_width=True)
                         
                     if license_plates:
-                        st.success("Analysis Complete! Detected entries saved to JSON/DB.")
-                        st.json(list(license_plates))
+                        st.success("Analysis Complete! Detected entries saved to DB.")
                         
+                        # Watchlist Check
+                        for plate in license_plates.keys():
+                            if watchlist and plate in watchlist:
+                                st.error(f"🚨 **WATCHLIST ALERT!** Wanted vehicle `{plate}` has been detected!")
+                                
                         current_time = datetime.now()
-                        save_lp_json(license_plates, current_time, current_time)
+                        save_lp_data(list(license_plates.keys()), current_time, current_time)
+                        
+                        session_data = [{"Time": current_time.strftime('%Y-%m-%d %H:%M:%S'), "License Plate": plate, "Image": img_uri} for plate, img_uri in license_plates.items()]
+                        st.subheader("Detected License Plates")
+                        
+                        df = pd.DataFrame(session_data)
+                        
+                        col_search, col_export = st.columns([3, 1])
+                        with col_search:
+                            search_term = st.text_input("🔍 Search Plates:", "", key="photo_search")
+                        with col_export:
+                            st.markdown("<br>", unsafe_allow_html=True)
+                            csv = df.drop(columns=["Image"], errors="ignore").to_csv(index=False).encode('utf-8')
+                            st.download_button(
+                                label="⬇️ Export to CSV",
+                                data=csv,
+                                file_name=f"anpr_export_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                                mime='text/csv',
+                                key="photo_export"
+                            )
+                            
+                        if search_term:
+                            df = df[df['License Plate'].str.contains(search_term.upper(), na=False)]
+                            
+                        st.dataframe(
+                            df,
+                            column_config={"Image": st.column_config.ImageColumn("Plate Image")},
+                            use_container_width=True
+                        )
                     else:
                         st.info("No license plate objects were detected by YOLO.")
 
@@ -525,7 +704,7 @@ def license_plate_mode(model):
             if not cap.isOpened():
                 st.error("Could not open camera. Check permissions or if another application is using it.")
             else:
-                lp_video_processing_loop(cap, model)
+                lp_video_processing_loop(cap, model, watchlist)
 
 # --- ATCC MODE LAYOUT ---
 
@@ -660,20 +839,66 @@ def atcc_mode(model, db: TrafficDB):
                     if total_frames == 0: total_frames = 100
 
                     frame_idx = 0
-                    all_results = []
                     video_placeholder = st.empty()
+                    last_annotated_frame = None
+                    last_processed_frame = None
+                    
+                    track_history = {}
+                    unique_vehicles_classes = {}
+                    incoming_count = 0
+                    outgoing_count = 0
 
                     while cap.isOpened():
                         ret, frame = cap.read()
                         if not ret: break
                         
-                        results = model.predict(frame, **args)
+                        # Use model.track for assigning persistent IDs across frames
+                        results = model.track(frame, persist=True, **args)
                         annotated_frame = results[0].plot()
-                        all_results.append(results[0])
-                        out.write(annotated_frame)
                         
-                        if frame_idx % 5 == 0:
-                            video_placeholder.image(annotated_frame, channels="BGR", caption=f"Processing Frame {frame_idx + 1}", use_container_width=True)
+                        # Draw Virtual Line (halfway down the frame)
+                        line_y = int(frame_height / 2)
+                        cv2.line(annotated_frame, (0, line_y), (frame_width, line_y), (0, 0, 255), 3)
+                        
+                        # Directional Tracking Logic
+                        if results[0].boxes is not None and results[0].boxes.id is not None:
+                            boxes = results[0].boxes.xywh.cpu()
+                            track_ids = results[0].boxes.id.int().cpu().tolist()
+                            cls_ids = results[0].boxes.cls.int().cpu().tolist()
+                            
+                            for box, track_id, cls_id in zip(boxes, track_ids, cls_ids):
+                                x, y, w, h = box
+                                
+                                if track_id not in unique_vehicles_classes:
+                                    try:
+                                        cls_name = results[0].names[cls_id]
+                                    except (AttributeError, KeyError):
+                                        cls_name = f"Class {cls_id}"
+                                    unique_vehicles_classes[track_id] = cls_name
+                                
+                                if track_id in track_history:
+                                    prev_y = track_history[track_id]
+                                    # Vehicle crossed the virtual line
+                                    if prev_y < line_y and y >= line_y:
+                                        incoming_count += 1
+                                    elif prev_y > line_y and y <= line_y:
+                                        outgoing_count += 1
+                                
+                                track_history[track_id] = y
+                        
+                        # Overlay counting UI
+                        cv2.putText(annotated_frame, f"Incoming: {incoming_count}", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
+                        cv2.putText(annotated_frame, f"Outgoing: {outgoing_count}", (10, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 3)
+                        
+                        last_annotated_frame = annotated_frame
+                        last_processed_frame = frame.copy()
+                        
+                        # Write to video (keeps original length/speed by reusing frames)
+                        out.write(last_annotated_frame)
+                        
+                        # Update Streamlit UI less frequently (every ~15 frames) to avoid websocket bottleneck
+                        if frame_idx % 15 == 0:
+                            video_placeholder.image(last_annotated_frame, channels="BGR", caption=f"Processing Frame {frame_idx + 1}/{total_frames}", use_container_width=True)
 
                         frame_idx += 1
                         progress_bar.progress(min(int(frame_idx / total_frames * 100), 100))
@@ -681,7 +906,26 @@ def atcc_mode(model, db: TrafficDB):
                     cap.release()
                     out.release()
                     
-                    results_summary = process_atcc_detection(all_results, db, source_type="Video")
+                    class_counts = {}
+                    for cls_name in unique_vehicles_classes.values():
+                        class_counts[cls_name] = class_counts.get(cls_name, 0) + 1
+                    
+                    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    total_vehicles = sum(class_counts.values())
+                    traffic_level = calculate_traffic_level(total_vehicles)
+
+                    for vehicle_class, count in class_counts.items():
+                        db.save_result(timestamp, "Video", vehicle_class, count, traffic_level)
+                    
+                    if not class_counts:
+                        db.save_result(timestamp, "Video", "N/A", 0, "No Traffic")
+
+                    results_summary = {
+                        'timestamp': timestamp,
+                        'total_vehicles': total_vehicles,
+                        'traffic_level': traffic_level,
+                        'class_counts': class_counts
+                    }
                     annotated_media = out_path
                     
                     video_placeholder.empty()
@@ -692,9 +936,31 @@ def atcc_mode(model, db: TrafficDB):
                 st.error(f"An error occurred during detection: {e}")
                 results_summary = None
             finally:
+                # Ensure resources are released
+                if 'cap' in locals() and cap is not None and cap.isOpened():
+                    cap.release()
+                if 'out' in locals() and out is not None:
+                    out.release()
+                    
                 # Clean up temporary files
-                if temp_path and os.path.exists(temp_path): os.remove(temp_path)
-                if annotated_media and os.path.exists(annotated_media) and media_type == 'video': os.remove(annotated_media)
+                if temp_path and os.path.exists(temp_path):
+                    try:
+                        time.sleep(1)
+                        os.remove(temp_path)
+                    except PermissionError:
+                        logger.warning("Temp input file still in use, skipping delete.")
+                    except Exception as e:
+                        logger.warning(f"Could not remove temp input file: {e}")
+                
+                if annotated_media and os.path.exists(annotated_media) and media_type == 'video':
+                    try:
+                        time.sleep(1)
+                        os.remove(annotated_media)
+                    except PermissionError:
+                        logger.warning("Temp output video still in use, skipping delete.")
+                    except Exception as e:
+                        logger.warning(f"Could not remove temp output video: {e}")
+                    
                 progress_bar.empty()
 
     # --- Display Results and Visualization ---
@@ -754,6 +1020,75 @@ def atcc_mode(model, db: TrafficDB):
         st.info("No historical analysis data is available yet. Run an analysis to populate the database.")
 
 
+# --- ANALYTICS DASHBOARD MODE ---
+
+def analytics_dashboard_mode(db):
+    apply_custom_styles()
+    st.markdown('<div class="main-header">Global Analytics Dashboard 📊</div>', unsafe_allow_html=True)
+    st.markdown("---")
+    
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.subheader("Traffic Analysis Overview")
+    with col2:
+        if st.button("🧹 Purge Old Data (> 30 days)"):
+            try:
+                with sqlite3.connect(db.db_name) as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("DELETE FROM analysis_results WHERE date(timestamp) < date('now', '-30 days')")
+                    conn.commit()
+                
+                with sqlite3.connect(LP_DB_PATH) as conn_lp:
+                    cursor_lp = conn_lp.cursor()
+                    cursor_lp.execute("DELETE FROM LicensePlates WHERE date(start_time) < date('now', '-30 days')")
+                    conn_lp.commit()
+                    
+                st.success("Old data purged successfully!")
+                logger.info("Purged old database records (>30 days).")
+            except Exception as e:
+                st.error(f"Error purging data: {e}")
+                logger.error(f"Purge data error: {e}")
+                
+    # Load ATCC data
+    df_atcc = db.fetch_all_data()
+    
+    # Load LP data
+    try:
+        with sqlite3.connect(LP_DB_PATH) as conn_lp:
+            df_lp = pd.read_sql_query("SELECT * FROM LicensePlates", conn_lp)
+    except sqlite3.Error as e:
+        logger.error(f"Error loading LP data for dashboard: {e}")
+        df_lp = pd.DataFrame()
+    
+    col_a, col_b, col_c = st.columns(3)
+    col_a.metric("Total Vehicles Counted (ATCC)", df_atcc['count'].sum() if not df_atcc.empty else 0)
+    col_b.metric("License Plates Logged", len(df_lp) if not df_lp.empty else 0)
+    col_c.metric("ATCC Sessions", len(df_atcc['timestamp'].unique()) if not df_atcc.empty else 0)
+    
+    st.markdown("---")
+    
+    col_charts1, col_charts2 = st.columns(2)
+    
+    with col_charts1:
+        st.subheader("Vehicle Class Distribution")
+        if not df_atcc.empty:
+            class_dist = df_atcc.groupby('vehicle_class')['count'].sum().reset_index()
+            fig, ax = plt.subplots(figsize=(6, 4))
+            ax.pie(class_dist['count'], labels=class_dist['vehicle_class'], autopct='%1.1f%%', startangle=90, colors=plt.cm.Paired.colors)
+            ax.axis('equal')
+            st.pyplot(fig)
+        else:
+            st.info("No ATCC data available.")
+            
+    with col_charts2:
+        st.subheader("Traffic Volume Over Time")
+        if not df_atcc.empty:
+            df_atcc['timestamp'] = pd.to_datetime(df_atcc['timestamp'])
+            time_vol = df_atcc.groupby('timestamp')['count'].sum().reset_index()
+            st.line_chart(data=time_vol, x='timestamp', y='count', use_container_width=True)
+        else:
+            st.info("No ATCC data available.")
+
 # --- MAIN APPLICATION ENTRY POINT ---
 
 def main():
@@ -761,10 +1096,10 @@ def main():
     
     st.sidebar.title("App Selection")
     
-    # Main selector for the two application modes
+    # Main selector for the three application modes
     app_mode = st.sidebar.radio(
         "Select Application Mode:",
-        ('License Plate Detector (LP) / OCR', 'Vehicle Traffic Analyzer (ATCC)'),
+        ('License Plate Detector (LP) / OCR', 'Vehicle Traffic Analyzer (ATCC)', 'Global Analytics Dashboard 📊'),
         key='app_mode_select'
     )
     
@@ -783,6 +1118,8 @@ def main():
         # Load the ATCC model
         atcc_model = initialize_yolo_model(ATCC_MODEL_PATH)
         atcc_mode(atcc_model, atcc_db)
+    elif app_mode == 'Global Analytics Dashboard 📊':
+        analytics_dashboard_mode(atcc_db)
 
 if __name__ == '__main__':
     main()

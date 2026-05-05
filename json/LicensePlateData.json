@@ -701,5 +701,451 @@
       "EE3",
       "NO_CLEAN_TEXT(BLANK)"
     ]
+  },
+  {
+    "Start Time": "2026-04-30T21:19:43.015845",
+    "End Time": "2026-04-30T21:20:03.368710",
+    "License Plates": [
+      "NO_CLEAN_TEXT(BLANK)",
+      "NO_CLEAN_TEXT(+)",
+      "BS"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:20:03.368710",
+    "End Time": "2026-04-30T21:20:24.134317",
+    "License Plates": [
+      "EITEN",
+      "NO_CLEAN_TEXT(<)",
+      "BS",
+      "SO",
+      "NO_CLEAN_TEXT(+)",
+      "S",
+      "NO_CLEAN_TEXT(BLANK)",
+      "SK"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:20:24.134317",
+    "End Time": "2026-04-30T21:20:45.321345",
+    "License Plates": [
+      "SO",
+      "NO_CLEAN_TEXT(+)",
+      "RO",
+      "NO_CLEAN_TEXT(BLANK)",
+      "LSA"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:20:45.321345",
+    "End Time": "2026-04-30T21:21:05.702179",
+    "License Plates": [
+      "SN",
+      "RO",
+      "AIE",
+      "SA",
+      "NO_CLEAN_TEXT(BLANK)",
+      "A",
+      "SK"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:21:05.702179",
+    "End Time": "2026-04-30T21:21:26.657544",
+    "License Plates": [
+      "NO_CLEAN_TEXT(BLANK)"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:21:26.657544",
+    "End Time": "2026-04-30T21:21:47.758069",
+    "License Plates": [
+      "NO_CLEAN_TEXT(BLANK)",
+      "SK",
+      "NO_CLEAN_TEXT(+)"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:21:47.758069",
+    "End Time": "2026-04-30T21:22:08.598043",
+    "License Plates": [
+      "NO_CLEAN_TEXT(BLANK)",
+      "43",
+      "NO_CLEAN_TEXT(\u00b0:)",
+      "NO_CLEAN_TEXT(+)"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:22:08.598043",
+    "End Time": "2026-04-30T21:22:29.048525",
+    "License Plates": [
+      "NO_CLEAN_TEXT(BLANK)",
+      "NO_CLEAN_TEXT(\u00b0)"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:22:29.048525",
+    "End Time": "2026-04-30T21:22:50.283796",
+    "License Plates": [
+      "NO_CLEAN_TEXT(BLANK)",
+      "SY",
+      "S",
+      "EO"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:22:50.283796",
+    "End Time": "2026-04-30T21:23:10.623900",
+    "License Plates": [
+      "NO_CLEAN_TEXT(BLANK)",
+      "A",
+      "EO"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:23:10.623900",
+    "End Time": "2026-04-30T21:23:31.835623",
+    "License Plates": [
+      "NO_CLEAN_TEXT(BLANK)",
+      "EO",
+      "OF3"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:23:31.835623",
+    "End Time": "2026-04-30T21:23:52.117793",
+    "License Plates": [
+      "NO_CLEAN_TEXT(BLANK)",
+      "A",
+      "EO"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:23:52.117793",
+    "End Time": "2026-04-30T21:24:12.530130",
+    "License Plates": [
+      "AS",
+      "EO",
+      "OM",
+      "ET",
+      "AA",
+      "NO_CLEAN_TEXT(BLANK)",
+      "A"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:24:12.530130",
+    "End Time": "2026-04-30T21:24:32.908920",
+    "License Plates": [
+      "S",
+      "NO_CLEAN_TEXT(+)",
+      "NO_CLEAN_TEXT(BLANK)",
+      "A",
+      "FE"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:24:32.908920",
+    "End Time": "2026-04-30T21:24:53.485681",
+    "License Plates": [
+      "NO_CLEAN_TEXT(BLANK)",
+      "NO_CLEAN_TEXT(+)",
+      "OE"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:24:53.485681",
+    "End Time": "2026-04-30T21:25:13.853006",
+    "License Plates": [
+      "IMA",
+      "2",
+      "NO_CLEAN_TEXT(._.)",
+      "R2",
+      "NO_CLEAN_TEXT(BLANK)",
+      "OE",
+      "NO_CLEAN_TEXT(, : >)"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:25:13.853006",
+    "End Time": "2026-04-30T21:25:34.172723",
+    "License Plates": [
+      "TS",
+      "AS",
+      "NO_CLEAN_TEXT(-)",
+      "NO_CLEAN_TEXT(=,)",
+      "SA",
+      "NO_CLEAN_TEXT(BLANK)"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:25:34.172723",
+    "End Time": "2026-04-30T21:25:54.694087",
+    "License Plates": [
+      "NO_CLEAN_TEXT(BLANK)",
+      "S",
+      "SS"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:25:54.694087",
+    "End Time": "2026-04-30T21:26:15.586051",
+    "License Plates": [
+      "NO_CLEAN_TEXT(BLANK)",
+      "A",
+      "SA"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:26:15.586051",
+    "End Time": "2026-04-30T21:26:36.396893",
+    "License Plates": [
+      "EOE",
+      "FY",
+      "SA",
+      "NO_CLEAN_TEXT(BLANK)",
+      "A",
+      "EY",
+      "REA"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:26:36.396893",
+    "End Time": "2026-04-30T21:26:56.872193",
+    "License Plates": [
+      "FSA",
+      "SA",
+      "ES",
+      "NO_CLEAN_TEXT(BLANK)",
+      "A"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:26:56.872193",
+    "End Time": "2026-04-30T21:27:17.590526",
+    "License Plates": [
+      "AA",
+      "SA",
+      "PEES",
+      "NO_CLEAN_TEXT(BLANK)",
+      "A",
+      "PEE"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:27:17.590526",
+    "End Time": "2026-04-30T21:27:39.199308",
+    "License Plates": [
+      "NO_CLEAN_TEXT(BLANK)"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:27:39.199308",
+    "End Time": "2026-04-30T21:27:59.542692",
+    "License Plates": [
+      "NO_CLEAN_TEXT(BLANK)"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:27:59.542692",
+    "End Time": "2026-04-30T21:28:20.262445",
+    "License Plates": [
+      "NO_CLEAN_TEXT(BLANK)"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:28:20.262445",
+    "End Time": "2026-04-30T21:28:40.644337",
+    "License Plates": [
+      "NO_CLEAN_TEXT(BLANK)",
+      "CSA",
+      "IY",
+      "TSA"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:28:40.644337",
+    "End Time": "2026-04-30T21:29:01.412750",
+    "License Plates": [
+      "NO_CLEAN_TEXT(BLANK)",
+      "SK",
+      "PSK"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:29:01.412750",
+    "End Time": "2026-04-30T21:29:22.233321",
+    "License Plates": [
+      "NO_CLEAN_TEXT(BLANK)",
+      "SK",
+      "PSK",
+      "SA"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:29:22.233321",
+    "End Time": "2026-04-30T21:29:43.160773",
+    "License Plates": [
+      "NO_CLEAN_TEXT(BLANK)",
+      "SA"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:29:43.160773",
+    "End Time": "2026-04-30T21:30:03.907345",
+    "License Plates": [
+      "NO_CLEAN_TEXT(BLANK)",
+      "NO_CLEAN_TEXT(+)",
+      "PSA"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:30:03.907345",
+    "End Time": "2026-04-30T21:30:23.949216",
+    "License Plates": [
+      "NO_CLEAN_TEXT(BLANK)"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:30:23.949216",
+    "End Time": "2026-04-30T21:30:44.169040",
+    "License Plates": [
+      "NO_CLEAN_TEXT(BLANK)",
+      "SK",
+      "NO_CLEAN_TEXT(+)",
+      "FSA"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:30:44.169040",
+    "End Time": "2026-04-30T21:31:04.648438",
+    "License Plates": [
+      "NO_CLEAN_TEXT(BLANK)",
+      "BO",
+      "FSA",
+      "NO_CLEAN_TEXT(+)"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:31:04.648438",
+    "End Time": "2026-04-30T21:31:25.243025",
+    "License Plates": [
+      "GS",
+      "NO_CLEAN_TEXT(BLANK)",
+      "A",
+      "FA",
+      "NO_CLEAN_TEXT(\u00a5)"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:31:25.243025",
+    "End Time": "2026-04-30T21:31:45.404864",
+    "License Plates": [
+      "NO_CLEAN_TEXT(+)",
+      "FAY",
+      "NO_CLEAN_TEXT(BLANK)",
+      "FA",
+      "A7"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:31:45.404864",
+    "End Time": "2026-04-30T21:32:05.494129",
+    "License Plates": [
+      "NO_CLEAN_TEXT(BLANK)",
+      "A",
+      "NO_CLEAN_TEXT(=)",
+      "FE"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:32:05.494129",
+    "End Time": "2026-04-30T21:32:26.396175",
+    "License Plates": [
+      "AL",
+      "NO_CLEAN_TEXT(=)",
+      "NO_CLEAN_TEXT(= =)",
+      "IPL",
+      "NO_CLEAN_TEXT(BLANK)",
+      "IAL"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:32:26.396175",
+    "End Time": "2026-04-30T21:32:46.905095",
+    "License Plates": [
+      "NO_CLEAN_TEXT(BLANK)",
+      "IACT",
+      "PORM",
+      "RL"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:32:46.905095",
+    "End Time": "2026-04-30T21:33:07.829605",
+    "License Plates": [
+      "2",
+      "S",
+      "LT",
+      "IAD",
+      "YS",
+      "NO_CLEAN_TEXT(BLANK)"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:33:07.829605",
+    "End Time": "2026-04-30T21:33:28.501441",
+    "License Plates": [
+      "2",
+      "NO_CLEAN_TEXT(\u201c)",
+      "BA",
+      "W2",
+      "IAD",
+      "NO_CLEAN_TEXT(.)",
+      "NO_CLEAN_TEXT(BLANK)",
+      "IALN",
+      "SSA"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:33:28.501441",
+    "End Time": "2026-04-30T21:33:48.875226",
+    "License Plates": [
+      "NO_CLEAN_TEXT(BLANK)",
+      "A"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:33:48.875226",
+    "End Time": "2026-04-30T21:34:10.202207",
+    "License Plates": [
+      "ME",
+      "ING",
+      "NO_CLEAN_TEXT(=)",
+      "S",
+      "NO_CLEAN_TEXT(BLANK)"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:34:10.202207",
+    "End Time": "2026-04-30T21:34:30.441449",
+    "License Plates": [
+      "NO_CLEAN_TEXT(\u2018 \u00a5)",
+      "NO_CLEAN_TEXT(\u2018 %)",
+      "NO_CLEAN_TEXT(BLANK)",
+      "FS",
+      "NO_CLEAN_TEXT(\u2019 \u00a5 :)"
+    ]
+  },
+  {
+    "Start Time": "2026-04-30T21:34:30.441449",
+    "End Time": "2026-04-30T21:34:50.696594",
+    "License Plates": [
+      "NO_CLEAN_TEXT(\u201c)",
+      "ME",
+      "SA",
+      "NO_CLEAN_TEXT(BLANK)",
+      "GN"
+    ]
   }
 ]
