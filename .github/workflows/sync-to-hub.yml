@@ -22,14 +22,15 @@ jobs:
           git config --global user.email "actions@github.com"
           git config --global user.name "GitHub Actions"
           
-          # Force clean state by removing notebooks and large files
+          # 1. DELETE the files Hugging Face is rejecting
           rm -rf notebook/
+          rm -f Agile_Document.xlsm
           
-          # Create a new branch with NO history to bypass size limits for old commits
+          # 2. Create a clean branch with NO history to bypass the 10MB limit
           git checkout --orphan temp-branch
           git add -A
-          git commit -m "Clean sync to Hugging Face"
+          git commit -m "Deployment sync: removed blocked binary files"
           
-          # Push to the Space
+          # 3. Force push to Hugging Face
           git remote add hf https://pavandoddavarapu:$HF_TOKEN@huggingface.co/spaces/pavandoddavarapu/anpr_atcc_project
           git push --force hf temp-branch:main
