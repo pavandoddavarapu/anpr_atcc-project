@@ -54,7 +54,7 @@ import pytesseract
 pytesseract.pytesseract.tesseract_cmd = TESSERACT_CMD_PATH
 
 # Model paths
-LP_CUSTOM_WEIGHTS_PATH = os.getenv("LP_MODEL_PATH", "weights/best.pt")
+LP_CUSTOM_WEIGHTS_PATH = os.getenv("LP_MODEL_PATH", "best.pt")
 ATCC_MODEL_PATH = os.getenv("ATCC_MODEL_PATH", "yolo11n.pt")
 
 # Databases
