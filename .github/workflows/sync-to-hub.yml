@@ -10,7 +10,6 @@ jobs:
 sync:
 runs-on: ubuntu-latest
 
-```
 steps:
   - name: Checkout repo
     uses: actions/checkout@v3
@@ -23,4 +22,3 @@ steps:
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
     run: |
       git push --force https://pavandoddavarapu:$HF_TOKEN@huggingface.co/spaces/pavandoddavarapu/anpr_atcc_project main
-```
