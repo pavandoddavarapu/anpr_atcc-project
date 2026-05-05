@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
 jobs:
@@ -21,11 +20,15 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          # Configure git identity
+          # 1. Remove the notebook folder so it doesn't get pushed to HF
+          rm -rf notebook/
+          
+          # 2. Configure git and commit the deletion locally (won't affect GitHub)
           git config --global user.email "actions@github.com"
           git config --global user.name "GitHub Actions"
+          git add .
+          git commit -m "Remove notebooks for HF deployment"
           
-          # Add the Hugging Face Space as a remote and push
-          # Replace 'pavandoddavarapu' and 'anpr_atcc_project' if they change
+          # 3. Force push the cleaned branch to Hugging Face
           git remote add hf https://pavandoddavarapu:$HF_TOKEN@huggingface.co/spaces/pavandoddavarapu/anpr_atcc_project
           git push --force hf main
